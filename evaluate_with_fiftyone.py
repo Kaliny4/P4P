@@ -9,6 +9,7 @@ from fiftyone.core.labels import Detections, Detection, Segmentation
 import fiftyone.utils.coco as fouc
 from PIL import Image, ImageDraw
 
+
 def delete_datasets():
     datasets = fo.list_datasets()
     print(datasets)
@@ -16,6 +17,8 @@ def delete_datasets():
         fo.delete_dataset(dataset_name)
         print(f"Deleted dataset: {dataset_name}")
     view = None
+
+
 delete_datasets()
 
 images_dir = "/home/student/Documents/Project7.v1-no_augmentation.coco/test"
@@ -50,7 +53,7 @@ sample_ids = [sample.id for sample in dataset]
 # Ensure the annotations match the sample IDs
 for annotation in coco_data["annotations"]:
     image_id = annotation["image_id"]
-    #if image_id not in sample_ids:
+    # if image_id not in sample_ids:
     #    print(f"Image ID {image_id} not found in dataset")
 
 # Initialize dictionaries to store detections and segmentations
@@ -67,20 +70,29 @@ with fo.ProgressBar() as pb:
 
         # Find the corresponding sample using its filepath
         image_info = next(img for img in coco_data["images"] if img["id"] == image_id)
-        sample = dataset.match({"filepath": os.path.join(images_dir, image_info["file_name"])}).first()
+        sample = dataset.match(
+            {"filepath": os.path.join(images_dir, image_info["file_name"])}
+        ).first()
 
         if sample is None:
             print(f"Sample for image ID {image_id} not found")
             continue
         # Convert bbox to FiftyOne format
         x, y, width, height = bbox
-        rel_box = [x / sample.metadata.width, y / sample.metadata.height, width / sample.metadata.width, height / sample.metadata.height]
+        rel_box = [
+            x / sample.metadata.width,
+            y / sample.metadata.height,
+            width / sample.metadata.width,
+            height / sample.metadata.height,
+        ]
 
         # Create detection
         detection = fo.Detection(
             label=classes[category_id],
             bounding_box=rel_box,
-            confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+            confidence=annotation.get(
+                "score", 1.0
+            ),  # Default to 1.0 if score is not provided
         )
         # Store detection in dictionary
         if sample.id not in detections_dict:
@@ -89,12 +101,12 @@ with fo.ProgressBar() as pb:
             detections_dict[sample.id].append(detection)
 
         if segmentation:
-            mask = Image.new('L', (int(width), int(height)), 0)
+            mask = Image.new("L", (int(width), int(height)), 0)
             draw = ImageDraw.Draw(mask)
             for seg in segmentation:
-         
+
                 seg = np.array(seg, dtype=np.float64).reshape(-1, 2)
-                #seg = np.array(seg).reshape(-1, 2)
+                # seg = np.array(seg).reshape(-1, 2)
                 seg[:, 0] -= x
                 seg[:, 1] -= y
                 seg[:, 0] = np.clip(seg[:, 0], 0, width - 1)
@@ -107,9 +119,11 @@ with fo.ProgressBar() as pb:
                 bounding_box=rel_box,
                 iscrowd=0,
                 mask=mask,
-                confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+                confidence=annotation.get(
+                    "score", 1.0
+                ),  # Default to 1.0 if score is not provided
             )
- 
+
             # Store segmentation in dictionary
             if sample.id not in segmentations_dict:
                 segmentations_dict[sample.id] = [segmentation]
@@ -123,20 +137,24 @@ for sample in dataset:
     if image_id in detections_dict:
         sample["predictions_bbox"] = fo.Detections(detections=detections_dict[image_id])
         print(f"{image_id} - {len(detections_dict[image_id])}")
-        
+
     if image_id in segmentations_dict:
-        sample["predictions_bbox"] = fo.Detections(detections=segmentations_dict[image_id]) #"predictions_mask"
+        sample["predictions_bbox"] = fo.Detections(
+            detections=segmentations_dict[image_id]
+        )  # "predictions_mask"
         print(f"Seg: {image_id} - {len(detections_dict[image_id])}")
-        #for detection in sample["predictions_mask"].detections:
-            #print(f"PRED Segmentation mask size: {detection.mask.shape}")
-            #print(detection)
+        # for detection in sample["predictions_mask"].detections:
+        # print(f"PRED Segmentation mask size: {detection.mask.shape}")
+        # print(detection)
     sample.save()
 sample = dataset.first()
 
-#gt_segmentations = sample["gt_segmentations"]
-#for detection in gt_segmentations.detections:
+# gt_segmentations = sample["gt_segmentations"]
+# for detection in gt_segmentations.detections:
 #    print(f"GT Segmentation mask size: {detection.mask.shape}")
-sample_with_segmentation = next((s for s in dataset if s.id in segmentations_dict), None)
+sample_with_segmentation = next(
+    (s for s in dataset if s.id in segmentations_dict), None
+)
 
 if sample_with_segmentation:
     # Get the first segmentation mask and bounding box from the selected sample
@@ -151,9 +169,10 @@ if sample_with_segmentation:
 print("Binary mask image saved successfully.")
 print("Fields in dataset:", dataset.get_field_schema().keys())
 dataset.rename_sample_field("predictions_bbox", "yolo12s_det_raynoise_blurr")
-results_y12s_ray = dataset.evaluate_detections("yolo12s_det_raynoise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y12s_ray = dataset.evaluate_detections(
+    "yolo12s_det_raynoise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks1",
     method="coco",
@@ -162,8 +181,8 @@ results_y12s_ray = dataset.evaluate_detections("yolo12s_det_raynoise_blurr",
 )
 
 print("mAP50_yolo12s_det_raynoise_blurr:", results_y12s_ray.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y12s_ray.print_report()
 
 # Inspect the first sample to find the correct attribute name
@@ -182,7 +201,7 @@ sample_ids = [sample.id for sample in dataset]
 # Ensure the annotations match the sample IDs
 for annotation in coco_data["annotations"]:
     image_id = annotation["image_id"]
-    #if image_id not in sample_ids:
+    # if image_id not in sample_ids:
     #    print(f"Image ID {image_id} not found in dataset")
 
 # Initialize dictionaries to store detections and segmentations
@@ -199,20 +218,29 @@ with fo.ProgressBar() as pb:
 
         # Find the corresponding sample using its filepath
         image_info = next(img for img in coco_data["images"] if img["id"] == image_id)
-        sample = dataset.match({"filepath": os.path.join(images_dir, image_info["file_name"])}).first()
+        sample = dataset.match(
+            {"filepath": os.path.join(images_dir, image_info["file_name"])}
+        ).first()
 
         if sample is None:
             print(f"Sample for image ID {image_id} not found")
             continue
         # Convert bbox to FiftyOne format
         x, y, width, height = bbox
-        rel_box = [x / sample.metadata.width, y / sample.metadata.height, width / sample.metadata.width, height / sample.metadata.height]
+        rel_box = [
+            x / sample.metadata.width,
+            y / sample.metadata.height,
+            width / sample.metadata.width,
+            height / sample.metadata.height,
+        ]
 
         # Create detection
         detection = fo.Detection(
             label=classes[category_id],
             bounding_box=rel_box,
-            confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+            confidence=annotation.get(
+                "score", 1.0
+            ),  # Default to 1.0 if score is not provided
         )
         # Store detection in dictionary
         if sample.id not in detections_dict:
@@ -221,12 +249,12 @@ with fo.ProgressBar() as pb:
             detections_dict[sample.id].append(detection)
 
         if segmentation:
-            mask = Image.new('L', (int(width), int(height)), 0)
+            mask = Image.new("L", (int(width), int(height)), 0)
             draw = ImageDraw.Draw(mask)
             for seg in segmentation:
-         
+
                 seg = np.array(seg, dtype=np.float64).reshape(-1, 2)
-                #seg = np.array(seg).reshape(-1, 2)
+                # seg = np.array(seg).reshape(-1, 2)
                 seg[:, 0] -= x
                 seg[:, 1] -= y
                 seg[:, 0] = np.clip(seg[:, 0], 0, width - 1)
@@ -239,9 +267,11 @@ with fo.ProgressBar() as pb:
                 bounding_box=rel_box,
                 iscrowd=0,
                 mask=mask,
-                confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+                confidence=annotation.get(
+                    "score", 1.0
+                ),  # Default to 1.0 if score is not provided
             )
- 
+
             # Store segmentation in dictionary
             if sample.id not in segmentations_dict:
                 segmentations_dict[sample.id] = [segmentation]
@@ -255,20 +285,24 @@ for sample in dataset:
     if image_id in detections_dict:
         sample["predictions_bbox"] = fo.Detections(detections=detections_dict[image_id])
         print(f"{image_id} - {len(detections_dict[image_id])}")
-        
+
     if image_id in segmentations_dict:
-        sample["predictions_bbox"] = fo.Detections(detections=segmentations_dict[image_id]) #"predictions_mask"
+        sample["predictions_bbox"] = fo.Detections(
+            detections=segmentations_dict[image_id]
+        )  # "predictions_mask"
         print(f"Seg: {image_id} - {len(detections_dict[image_id])}")
-        #for detection in sample["predictions_mask"].detections:
-            #print(f"PRED Segmentation mask size: {detection.mask.shape}")
-            #print(detection)
+        # for detection in sample["predictions_mask"].detections:
+        # print(f"PRED Segmentation mask size: {detection.mask.shape}")
+        # print(detection)
     sample.save()
 sample = dataset.first()
 
-#gt_segmentations = sample["gt_segmentations"]
-#for detection in gt_segmentations.detections:
+# gt_segmentations = sample["gt_segmentations"]
+# for detection in gt_segmentations.detections:
 #    print(f"GT Segmentation mask size: {detection.mask.shape}")
-sample_with_segmentation = next((s for s in dataset if s.id in segmentations_dict), None)
+sample_with_segmentation = next(
+    (s for s in dataset if s.id in segmentations_dict), None
+)
 
 if sample_with_segmentation:
     # Get the first segmentation mask and bounding box from the selected sample
@@ -283,9 +317,10 @@ if sample_with_segmentation:
 print("Binary mask image saved successfully.")
 print("Fields in dataset:", dataset.get_field_schema().keys())
 dataset.rename_sample_field("predictions_bbox", "yolo12s_aug_det_noise_blurr")
-results_y12s_aug = dataset.evaluate_detections("yolo12s_aug_det_noise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y12s_aug = dataset.evaluate_detections(
+    "yolo12s_aug_det_noise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks2",
     method="coco",
@@ -294,8 +329,8 @@ results_y12s_aug = dataset.evaluate_detections("yolo12s_aug_det_noise_blurr",
 )
 
 print("mAP50_yolo12s_aug_det_noise_blurr:", results_y12s_aug.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y12s_aug.print_report()
 
 #################################################################################################################################
@@ -314,7 +349,7 @@ sample_ids = [sample.id for sample in dataset]
 # Ensure the annotations match the sample IDs
 for annotation in coco_data["annotations"]:
     image_id = annotation["image_id"]
-    #if image_id not in sample_ids:
+    # if image_id not in sample_ids:
     #    print(f"Image ID {image_id} not found in dataset")
 
 # Initialize dictionaries to store detections and segmentations
@@ -331,20 +366,29 @@ with fo.ProgressBar() as pb:
 
         # Find the corresponding sample using its filepath
         image_info = next(img for img in coco_data["images"] if img["id"] == image_id)
-        sample = dataset.match({"filepath": os.path.join(images_dir, image_info["file_name"])}).first()
+        sample = dataset.match(
+            {"filepath": os.path.join(images_dir, image_info["file_name"])}
+        ).first()
 
         if sample is None:
             print(f"Sample for image ID {image_id} not found")
             continue
         # Convert bbox to FiftyOne format
         x, y, width, height = bbox
-        rel_box = [x / sample.metadata.width, y / sample.metadata.height, width / sample.metadata.width, height / sample.metadata.height]
+        rel_box = [
+            x / sample.metadata.width,
+            y / sample.metadata.height,
+            width / sample.metadata.width,
+            height / sample.metadata.height,
+        ]
 
         # Create detection
         detection = fo.Detection(
             label=classes[category_id],
             bounding_box=rel_box,
-            confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+            confidence=annotation.get(
+                "score", 1.0
+            ),  # Default to 1.0 if score is not provided
         )
         # Store detection in dictionary
         if sample.id not in detections_dict:
@@ -353,12 +397,12 @@ with fo.ProgressBar() as pb:
             detections_dict[sample.id].append(detection)
 
         if segmentation:
-            mask = Image.new('L', (int(width), int(height)), 0)
+            mask = Image.new("L", (int(width), int(height)), 0)
             draw = ImageDraw.Draw(mask)
             for seg in segmentation:
-         
+
                 seg = np.array(seg, dtype=np.float64).reshape(-1, 2)
-                #seg = np.array(seg).reshape(-1, 2)
+                # seg = np.array(seg).reshape(-1, 2)
                 seg[:, 0] -= x
                 seg[:, 1] -= y
                 seg[:, 0] = np.clip(seg[:, 0], 0, width - 1)
@@ -371,9 +415,11 @@ with fo.ProgressBar() as pb:
                 bounding_box=rel_box,
                 iscrowd=0,
                 mask=mask,
-                confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+                confidence=annotation.get(
+                    "score", 1.0
+                ),  # Default to 1.0 if score is not provided
             )
- 
+
             # Store segmentation in dictionary
             if sample.id not in segmentations_dict:
                 segmentations_dict[sample.id] = [segmentation]
@@ -387,20 +433,24 @@ for sample in dataset:
     if image_id in detections_dict:
         sample["predictions_bbox"] = fo.Detections(detections=detections_dict[image_id])
         print(f"{image_id} - {len(detections_dict[image_id])}")
-        
+
     if image_id in segmentations_dict:
-        sample["predictions_mask"] = fo.Detections(detections=segmentations_dict[image_id]) #"predictions_mask"
+        sample["predictions_mask"] = fo.Detections(
+            detections=segmentations_dict[image_id]
+        )  # "predictions_mask"
         print(f"Seg: {image_id} - {len(detections_dict[image_id])}")
-        #for detection in sample["predictions_mask"].detections:
-            #print(f"PRED Segmentation mask size: {detection.mask.shape}")
-            #print(detection)
+        # for detection in sample["predictions_mask"].detections:
+        # print(f"PRED Segmentation mask size: {detection.mask.shape}")
+        # print(detection)
     sample.save()
 sample = dataset.first()
 
-#gt_segmentations = sample["gt_segmentations"]
-#for detection in gt_segmentations.detections:
+# gt_segmentations = sample["gt_segmentations"]
+# for detection in gt_segmentations.detections:
 #    print(f"GT Segmentation mask size: {detection.mask.shape}")
-sample_with_segmentation = next((s for s in dataset if s.id in segmentations_dict), None)
+sample_with_segmentation = next(
+    (s for s in dataset if s.id in segmentations_dict), None
+)
 
 if sample_with_segmentation:
     # Get the first segmentation mask and bounding box from the selected sample
@@ -416,9 +466,10 @@ print("Binary mask image saved successfully.")
 print("Fields in dataset:", dataset.get_field_schema().keys())
 dataset.rename_sample_field("predictions_mask", "mask_yolo11n_seg_ray_noise_blurr")
 dataset.rename_sample_field("predictions_bbox", "bbox_yolo11n_seg_ray_noise_blurr")
-results_y11n_ray_mask = dataset.evaluate_detections("mask_yolo11n_seg_ray_noise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y11n_ray_mask = dataset.evaluate_detections(
+    "mask_yolo11n_seg_ray_noise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks3",
     method="coco",
@@ -427,13 +478,14 @@ results_y11n_ray_mask = dataset.evaluate_detections("mask_yolo11n_seg_ray_noise_
 )
 
 print("mAP50_mask_yolo11n_seg_ray_noise_blurr:", results_y11n_ray_mask.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y11n_ray_mask.print_report()
 
-results_y11n_ray_bbox = dataset.evaluate_detections("bbox_yolo11n_seg_ray_noise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y11n_ray_bbox = dataset.evaluate_detections(
+    "bbox_yolo11n_seg_ray_noise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks4",
     method="coco",
@@ -442,8 +494,8 @@ results_y11n_ray_bbox = dataset.evaluate_detections("bbox_yolo11n_seg_ray_noise_
 )
 
 print("mAP50_bbox_yolo11n_seg_ray_noise_blurr:", results_y11n_ray_bbox.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y11n_ray_bbox.print_report()
 
 
@@ -463,7 +515,7 @@ sample_ids = [sample.id for sample in dataset]
 # Ensure the annotations match the sample IDs
 for annotation in coco_data["annotations"]:
     image_id = annotation["image_id"]
-    #if image_id not in sample_ids:
+    # if image_id not in sample_ids:
     #    print(f"Image ID {image_id} not found in dataset")
 
 # Initialize dictionaries to store detections and segmentations
@@ -480,20 +532,29 @@ with fo.ProgressBar() as pb:
 
         # Find the corresponding sample using its filepath
         image_info = next(img for img in coco_data["images"] if img["id"] == image_id)
-        sample = dataset.match({"filepath": os.path.join(images_dir, image_info["file_name"])}).first()
+        sample = dataset.match(
+            {"filepath": os.path.join(images_dir, image_info["file_name"])}
+        ).first()
 
         if sample is None:
             print(f"Sample for image ID {image_id} not found")
             continue
         # Convert bbox to FiftyOne format
         x, y, width, height = bbox
-        rel_box = [x / sample.metadata.width, y / sample.metadata.height, width / sample.metadata.width, height / sample.metadata.height]
+        rel_box = [
+            x / sample.metadata.width,
+            y / sample.metadata.height,
+            width / sample.metadata.width,
+            height / sample.metadata.height,
+        ]
 
         # Create detection
         detection = fo.Detection(
             label=classes[category_id],
             bounding_box=rel_box,
-            confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+            confidence=annotation.get(
+                "score", 1.0
+            ),  # Default to 1.0 if score is not provided
         )
         # Store detection in dictionary
         if sample.id not in detections_dict:
@@ -502,12 +563,12 @@ with fo.ProgressBar() as pb:
             detections_dict[sample.id].append(detection)
 
         if segmentation:
-            mask = Image.new('L', (int(width), int(height)), 0)
+            mask = Image.new("L", (int(width), int(height)), 0)
             draw = ImageDraw.Draw(mask)
             for seg in segmentation:
-         
+
                 seg = np.array(seg, dtype=np.float64).reshape(-1, 2)
-                #seg = np.array(seg).reshape(-1, 2)
+                # seg = np.array(seg).reshape(-1, 2)
                 seg[:, 0] -= x
                 seg[:, 1] -= y
                 seg[:, 0] = np.clip(seg[:, 0], 0, width - 1)
@@ -520,9 +581,11 @@ with fo.ProgressBar() as pb:
                 bounding_box=rel_box,
                 iscrowd=0,
                 mask=mask,
-                confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+                confidence=annotation.get(
+                    "score", 1.0
+                ),  # Default to 1.0 if score is not provided
             )
- 
+
             # Store segmentation in dictionary
             if sample.id not in segmentations_dict:
                 segmentations_dict[sample.id] = [segmentation]
@@ -536,20 +599,24 @@ for sample in dataset:
     if image_id in detections_dict:
         sample["predictions_bbox"] = fo.Detections(detections=detections_dict[image_id])
         print(f"{image_id} - {len(detections_dict[image_id])}")
-        
+
     if image_id in segmentations_dict:
-        sample["predictions_mask"] = fo.Detections(detections=segmentations_dict[image_id]) #"predictions_mask"
+        sample["predictions_mask"] = fo.Detections(
+            detections=segmentations_dict[image_id]
+        )  # "predictions_mask"
         print(f"Seg: {image_id} - {len(detections_dict[image_id])}")
-        #for detection in sample["predictions_mask"].detections:
-            #print(f"PRED Segmentation mask size: {detection.mask.shape}")
-            #print(detection)
+        # for detection in sample["predictions_mask"].detections:
+        # print(f"PRED Segmentation mask size: {detection.mask.shape}")
+        # print(detection)
     sample.save()
 sample = dataset.first()
 
-#gt_segmentations = sample["gt_segmentations"]
-#for detection in gt_segmentations.detections:
+# gt_segmentations = sample["gt_segmentations"]
+# for detection in gt_segmentations.detections:
 #    print(f"GT Segmentation mask size: {detection.mask.shape}")
-sample_with_segmentation = next((s for s in dataset if s.id in segmentations_dict), None)
+sample_with_segmentation = next(
+    (s for s in dataset if s.id in segmentations_dict), None
+)
 
 if sample_with_segmentation:
     # Get the first segmentation mask and bounding box from the selected sample
@@ -565,9 +632,10 @@ print("Binary mask image saved successfully.")
 print("Fields in dataset:", dataset.get_field_schema().keys())
 dataset.rename_sample_field("predictions_mask", "mask_yolo11s_seg_raynoise_blurr")
 dataset.rename_sample_field("predictions_bbox", "bbox_yolo11s_seg_raynoise_blurr")
-results_y11s_ray_mask = dataset.evaluate_detections("mask_yolo11s_seg_raynoise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y11s_ray_mask = dataset.evaluate_detections(
+    "mask_yolo11s_seg_raynoise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks5",
     method="coco",
@@ -576,13 +644,14 @@ results_y11s_ray_mask = dataset.evaluate_detections("mask_yolo11s_seg_raynoise_b
 )
 
 print("mAP50_mask_yolo11s_seg_raynoise_blurr:", results_y11s_ray_mask.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y11s_ray_mask.print_report()
 
-results_y11s_ray_bbox = dataset.evaluate_detections("bbox_yolo11s_seg_raynoise_blurr",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_y11s_ray_bbox = dataset.evaluate_detections(
+    "bbox_yolo11s_seg_raynoise_blurr",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks6",
     method="coco",
@@ -591,8 +660,8 @@ results_y11s_ray_bbox = dataset.evaluate_detections("bbox_yolo11s_seg_raynoise_b
 )
 
 print("mAP50_bbox_yolo11s_seg_raynoise_blurr:", results_y11s_ray_bbox.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_y11s_ray_bbox.print_report()
 
 full_report = results_y11s_ray_bbox.report()
@@ -615,7 +684,7 @@ sample_ids = [sample.id for sample in dataset]
 # Ensure the annotations match the sample IDs
 for annotation in coco_data["annotations"]:
     image_id = annotation["image_id"]
-    #if image_id not in sample_ids:
+    # if image_id not in sample_ids:
     #    print(f"Image ID {image_id} not found in dataset")
 
 # Initialize dictionaries to store detections and segmentations
@@ -632,20 +701,29 @@ with fo.ProgressBar() as pb:
 
         # Find the corresponding sample using its filepath
         image_info = next(img for img in coco_data["images"] if img["id"] == image_id)
-        sample = dataset.match({"filepath": os.path.join(images_dir, image_info["file_name"])}).first()
+        sample = dataset.match(
+            {"filepath": os.path.join(images_dir, image_info["file_name"])}
+        ).first()
 
         if sample is None:
             print(f"Sample for image ID {image_id} not found")
             continue
         # Convert bbox to FiftyOne format
         x, y, width, height = bbox
-        rel_box = [x / sample.metadata.width, y / sample.metadata.height, width / sample.metadata.width, height / sample.metadata.height]
+        rel_box = [
+            x / sample.metadata.width,
+            y / sample.metadata.height,
+            width / sample.metadata.width,
+            height / sample.metadata.height,
+        ]
 
         # Create detection
         detection = fo.Detection(
             label=classes[category_id],
             bounding_box=rel_box,
-            confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+            confidence=annotation.get(
+                "score", 1.0
+            ),  # Default to 1.0 if score is not provided
         )
         # Store detection in dictionary
         if sample.id not in detections_dict:
@@ -654,12 +732,12 @@ with fo.ProgressBar() as pb:
             detections_dict[sample.id].append(detection)
 
         if segmentation:
-            mask = Image.new('L', (int(width), int(height)), 0)
+            mask = Image.new("L", (int(width), int(height)), 0)
             draw = ImageDraw.Draw(mask)
             for seg in segmentation:
-         
+
                 seg = np.array(seg, dtype=np.float64).reshape(-1, 2)
-                #seg = np.array(seg).reshape(-1, 2)
+                # seg = np.array(seg).reshape(-1, 2)
                 seg[:, 0] -= x
                 seg[:, 1] -= y
                 seg[:, 0] = np.clip(seg[:, 0], 0, width - 1)
@@ -672,9 +750,11 @@ with fo.ProgressBar() as pb:
                 bounding_box=rel_box,
                 iscrowd=0,
                 mask=mask,
-                confidence=annotation.get("score", 1.0)  # Default to 1.0 if score is not provided
+                confidence=annotation.get(
+                    "score", 1.0
+                ),  # Default to 1.0 if score is not provided
             )
- 
+
             # Store segmentation in dictionary
             if sample.id not in segmentations_dict:
                 segmentations_dict[sample.id] = [segmentation]
@@ -688,20 +768,24 @@ for sample in dataset:
     if image_id in detections_dict:
         sample["predictions_bbox"] = fo.Detections(detections=detections_dict[image_id])
         print(f"{image_id} - {len(detections_dict[image_id])}")
-        
+
     if image_id in segmentations_dict:
-        sample["predictions_mask"] = fo.Detections(detections=segmentations_dict[image_id]) #"predictions_mask"
+        sample["predictions_mask"] = fo.Detections(
+            detections=segmentations_dict[image_id]
+        )  # "predictions_mask"
         print(f"Seg: {image_id} - {len(detections_dict[image_id])}")
-        #for detection in sample["predictions_mask"].detections:
-            #print(f"PRED Segmentation mask size: {detection.mask.shape}")
-            #print(detection)
+        # for detection in sample["predictions_mask"].detections:
+        # print(f"PRED Segmentation mask size: {detection.mask.shape}")
+        # print(detection)
     sample.save()
 sample = dataset.first()
 
-#gt_segmentations = sample["gt_segmentations"]
-#for detection in gt_segmentations.detections:
+# gt_segmentations = sample["gt_segmentations"]
+# for detection in gt_segmentations.detections:
 #    print(f"GT Segmentation mask size: {detection.mask.shape}")
-sample_with_segmentation = next((s for s in dataset if s.id in segmentations_dict), None)
+sample_with_segmentation = next(
+    (s for s in dataset if s.id in segmentations_dict), None
+)
 
 if sample_with_segmentation:
     # Get the first segmentation mask and bounding box from the selected sample
@@ -717,9 +801,10 @@ print("Binary mask image saved successfully.")
 print("Fields in dataset:", dataset.get_field_schema().keys())
 dataset.rename_sample_field("predictions_mask", "mask_mask50_r_cnn")
 dataset.rename_sample_field("predictions_bbox", "bbox_mask50_r_cnn")
-results_mask50_r_cnn_mask= dataset.evaluate_detections("mask_mask50_r_cnn",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_mask50_r_cnn_mask = dataset.evaluate_detections(
+    "mask_mask50_r_cnn",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks7",
     method="coco",
@@ -728,13 +813,14 @@ results_mask50_r_cnn_mask= dataset.evaluate_detections("mask_mask50_r_cnn",
 )
 
 print("mAP50_mask50_r_cnn:", results_mask50_r_cnn_mask.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_mask50_r_cnn_mask.print_report()
 
-results_mask50_r_cnn_bbox = dataset.evaluate_detections("bbox_mask50_r_cnn",
-    #"predictions_mask",
-    #gt_field="gt_segmentations",
+results_mask50_r_cnn_bbox = dataset.evaluate_detections(
+    "bbox_mask50_r_cnn",
+    # "predictions_mask",
+    # gt_field="gt_segmentations",
     gt_field="gt_detections",
     eval_key="eval_masks8",
     method="coco",
@@ -743,8 +829,8 @@ results_mask50_r_cnn_bbox = dataset.evaluate_detections("bbox_mask50_r_cnn",
 )
 
 print("mAP50_bbox_mask50_r_cnn:", results_mask50_r_cnn_bbox.mAP())
-#print("Precision range:", dataset.bounds("eval_masks_precision"))
-#print("Recall range:", dataset.bounds("eval_masks_recall"))
+# print("Precision range:", dataset.bounds("eval_masks_precision"))
+# print("Recall range:", dataset.bounds("eval_masks_recall"))
 results_mask50_r_cnn_bbox.print_report()
 
 full_report = results_mask50_r_cnn_bbox.report()
@@ -754,6 +840,5 @@ with open("results_mask50_r_cnn_bbox_full.csv", "w") as f:
 
 ############################################################################################################################
 session = fo.launch_app(dataset)
-session.wait()  
+session.wait()
 print("FiftyOne App URL:", session.url)
-

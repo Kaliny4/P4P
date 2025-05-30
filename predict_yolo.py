@@ -9,9 +9,9 @@ import datetime
 from ultralytics import YOLO
 
 # --- Paths ---
-model_path = "/home/student/Documents/new_dataset/yolo11s_seg_raynoise_blurr/weights/best.pt"#"/home/student/Documents/new_dataset/yolo11n_seg_ray_noise_blurr/weights/best.pt"
-input_path = "/home/student/Documents/Mixed_17" #"/home/student/Documents/Project7.v1-no_augmentation.coco/test"
-#output_folder = os.path.join("/home/student/Documents/new_dataset/yolo11n_seg_ray_noise_blurr", "predictions")
+model_path = "/home/student/Documents/new_dataset/yolo11s_seg_raynoise_blurr/weights/best.pt"  # "/home/student/Documents/new_dataset/yolo11n_seg_ray_noise_blurr/weights/best.pt"
+input_path = "/home/student/Documents/Mixed_17"  # "/home/student/Documents/Project7.v1-no_augmentation.coco/test"
+# output_folder = os.path.join("/home/student/Documents/new_dataset/yolo11n_seg_ray_noise_blurr", "predictions")
 output_folder = os.path.join("/home/student/Documents/Mixed_17", "predictions")
 os.makedirs(output_folder, exist_ok=True)
 
@@ -20,19 +20,21 @@ os.makedirs(output_folder, exist_ok=True)
 model = YOLO(model_path)
 
 # --- Get list of images ---
-image_paths = [os.path.join(input_path, f)
-               for f in os.listdir(input_path)
-               if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+image_paths = [
+    os.path.join(input_path, f)
+    for f in os.listdir(input_path)
+    if f.lower().endswith((".jpg", ".jpeg", ".png"))
+]
 
 # --- COCO Format Init ---
 coco_output = {
     "info": {
         "description": "YOLOv11 Predictions",
-        "date_created": datetime.datetime.now().isoformat()
+        "date_created": datetime.datetime.now().isoformat(),
     },
     "images": [],
     "annotations": [],
-    "categories": [{"id": i, "name": name} for i, name in model.names.items()]
+    "categories": [{"id": i, "name": name} for i, name in model.names.items()],
 }
 annotation_id = 1
 
@@ -42,17 +44,6 @@ for image_id, img_path in enumerate(image_paths, start=1):
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     h, w = img.shape[:2]
 
-
-
-
-    # Run prediction
-    #results = model.predict(img_rgb)[0]
-    #results_list = model.predict([img_rgb])
-    #results = results_list[0]
-    
-    # Run prediction in stream mode to delay unpacking
-    
-    
     # --- Run predictions once ---
 results_iter = model.predict(source=image_paths, stream=True)
 
@@ -69,12 +60,14 @@ for image_id, (img_path, results) in enumerate(zip(image_paths, results_iter), s
             results.masks.protos = results.masks.protos.squeeze(0)
 
     # Add image info
-    coco_output["images"].append({
-        "id": image_id,
-        "file_name": os.path.basename(img_path),
-        "width": w,
-        "height": h
-    })
+    coco_output["images"].append(
+        {
+            "id": image_id,
+            "file_name": os.path.basename(img_path),
+            "width": w,
+            "height": h,
+        }
+    )
 
     # Boxes
     if results.boxes is not None:
@@ -87,9 +80,18 @@ for image_id, (img_path, results) in enumerate(zip(image_paths, results_iter), s
             height = y2 - y1
             bbox = [x1, y1, width, height]
             label = f"{model.names[cls_id]} {conf:.2f}"
-            cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-            cv2.putText(annotated, label, (int(x1), int(y1) - 5),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+            cv2.rectangle(
+                annotated, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2
+            )
+            cv2.putText(
+                annotated,
+                label,
+                (int(x1), int(y1) - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (255, 255, 255),
+                1,
+            )
 
     # Masks
     if results.masks is not None and results.masks.data is not None:
@@ -100,7 +102,9 @@ for image_id, (img_path, results) in enumerate(zip(image_paths, results_iter), s
             color_mask = np.zeros_like(annotated)
             color_mask[binary_mask == 1] = [0, 255, 0]
             annotated = cv2.addWeighted(annotated, 1.0, color_mask, 0.5, 0)
-            contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            contours, _ = cv2.findContours(
+                binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+            )
             polygons = [c.flatten().tolist() for c in contours if len(c.flatten()) >= 6]
             if not polygons:
                 continue
@@ -109,16 +113,18 @@ for image_id, (img_path, results) in enumerate(zip(image_paths, results_iter), s
             x_max, y_max = int(x_indices.max()), int(y_indices.max())
             bbox = [x_min, y_min, x_max - x_min, y_max - y_min]
             area = int(np.sum(binary_mask))
-            coco_output["annotations"].append({
-                "id": annotation_id,
-                "image_id": image_id,
-                "category_id": cls_id,
-                "segmentation": polygons,
-                "bbox": [float(x) for x in bbox],
-                "area": float(area),
-                "iscrowd": 0,
-                "score": float(conf)
-            })
+            coco_output["annotations"].append(
+                {
+                    "id": annotation_id,
+                    "image_id": image_id,
+                    "category_id": cls_id,
+                    "segmentation": polygons,
+                    "bbox": [float(x) for x in bbox],
+                    "area": float(area),
+                    "iscrowd": 0,
+                    "score": float(conf),
+                }
+            )
             annotation_id += 1
 
     # Save annotated image
@@ -127,8 +133,6 @@ for image_id, (img_path, results) in enumerate(zip(image_paths, results_iter), s
     print(f"Saved: {out_img}")
 
 # Save final annotations
-with open(os.path.join(output_folder, 'instances_predictions.json'), 'w') as f:
+with open(os.path.join(output_folder, "instances_predictions.json"), "w") as f:
     json.dump(coco_output, f)
 print("✅ Saved COCO annotations to instances_predictions.json")
-
-
